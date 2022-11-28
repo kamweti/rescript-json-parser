@@ -1,0 +1,24 @@
+{
+  "name": "rescript-json-parser",
+  "version": "1.0.0",
+  "description": "json parser in rescript",
+  "main": "index.js",
+  "scripts": {
+    "res:build": "rescript",
+    "res:clean": "rescript clean",
+    "res:start": "rescript build -w",
+    "test" : "jest"
+  },
+  "keywords": [
+    "rescript",
+    "json"
+  ],
+  "author": "Kamweti Muriuki",
+  "license": "MIT",
+  "devDependencies": {
+    "rescript": "^10.0.1"
+  },
+  "dependencies": {
+    "@greenlabs/rescript-jest": "^1.0.1"
+  }
+}

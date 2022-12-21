@@ -1,8 +1,19 @@
-open Jest
-open Expect
+open! Jest
+open! Expect
 
-describe("Can call the parse method", () => {
-    test("my value should be true", () => {
-        expect(true)->toBe(true)
-    });
-});
+let isValidJson = (jsonString) => {
+    switch Lexer.scan(jsonString) {
+    | Ok(_) => true
+    | _ => false
+    }
+}
+
+describe("Jest", () => {
+    test("test the lexer", () => {
+        
+        let jsonString = `{}`
+
+        expect(isValidJson(jsonString))->toBe(true)
+
+    })
+})

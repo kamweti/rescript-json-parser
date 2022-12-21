@@ -3,9 +3,9 @@
 
 var Caml_exceptions = require("rescript/lib/js/caml_exceptions.js");
 
-var Syntax_Error = /* @__PURE__ */Caml_exceptions.create("Token.Token.Syntax_Error");
+var Syntax_Error = /* @__PURE__ */Caml_exceptions.create("Token.Syntax_Error");
 
-function string_of_token(token) {
+function toString(token) {
   if (typeof token !== "number") {
     if (token.TAG === /* String */0) {
       return token._0;
@@ -14,28 +14,30 @@ function string_of_token(token) {
     }
   }
   switch (token) {
-    case /* LeftBracket */0 :
-        return "}";
-    case /* RightBracket */1 :
+    case /* LeftSquareBracket */0 :
+        return "[";
+    case /* RightSquareBracket */1 :
+        return "]";
+    case /* LeftCurlyBracket */2 :
         return "{";
-    case /* Comma */2 :
+    case /* RightCurlyBrace */3 :
+        return "}";
+    case /* Comma */4 :
         return ",";
-    case /* Colon */3 :
+    case /* Colon */5 :
         return ":";
-    case /* True */4 :
+    case /* True */6 :
         return "true";
-    case /* False */5 :
+    case /* False */7 :
         return "false";
-    case /* BackSlash */6 :
-        return "\\";
+    case /* Null */8 :
+        return "null";
+    case /* Eof */9 :
+        return "eof";
     
   }
 }
 
-var Token = {
-  Syntax_Error: Syntax_Error,
-  string_of_token: string_of_token
-};
-
-exports.Token = Token;
+exports.Syntax_Error = Syntax_Error;
+exports.toString = toString;
 /* No side effect */

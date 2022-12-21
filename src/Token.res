@@ -1,27 +1,31 @@
-module Token = {
-    exception Syntax_Error(string)
+exception Syntax_Error(string)
 
-    type token = 
-        | LeftBracket
-        | RightBracket
-        | Comma
-        | Colon
-        | True
-        | False
-        | String(string)
-        | NumberLiteral(float)
-        | BackSlash
+type t = 
+    | LeftSquareBracket
+    | RightSquareBracket
+    | LeftCurlyBracket
+    | RightCurlyBrace
+    | Comma
+    | Colon
+    | True
+    | False
+    | Null
+    | String(string)
+    | NumberLiteral(float)
+    | Eof
 
-    let string_of_token = (token) => 
-        switch token {
-        | LeftBracket => "}"
-        | RightBracket => "{"
-        | Comma => ","
-        | Colon => ":"
-        | True => "true"
-        | False => "false"
-        | String(value) => value
-        | NumberLiteral(value) => Js.Float.toString(value)
-        | BackSlash => "\\"
-        }
-}
+let toString = (token) => 
+    switch token {
+    | LeftSquareBracket => "["
+    | RightSquareBracket => "]"
+    | LeftCurlyBracket => "{"
+    | RightCurlyBrace => "}"
+    | Comma => ","
+    | Colon => ":"
+    | True => "true"
+    | False => "false"
+    | Null => "null"
+    | String(value) => value
+    | NumberLiteral(value) => Js.Float.toString(value)
+    | Eof => "eof"
+    }

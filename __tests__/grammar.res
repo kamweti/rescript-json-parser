@@ -9,11 +9,13 @@ let isValidJson = (jsonString) => {
 }
 
 describe("Jest", () => {
-    test("test the lexer", () => {
-        
-        let jsonString = `{}`
+
+    test("can scan a string", () => {
+
+        let jsonString = `{
+            "city" : "bujumbura"
+        }`
 
         expect(isValidJson(jsonString))->toBe(true)
-
     })
 })

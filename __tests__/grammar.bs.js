@@ -13,8 +13,8 @@ function isValidJson(jsonString) {
 }
 
 describe("Jest", (function () {
-        test("test the lexer", (function () {
-                return expect(isValidJson("{}")).toBe(true);
+        test("can scan a string", (function () {
+                return expect(isValidJson("{\n            \"city\" : \"bujumbura\"\n        }")).toBe(true);
               }));
       }));
 

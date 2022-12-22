@@ -10,6 +10,7 @@ type t = {
 
 type scanErrorType =
     | UknownCharacter
+    | UnterminatedString
 
 type singleScanResult =
     | FoundToken(Token.t)
@@ -29,20 +30,53 @@ let makeLexer = (str) => {
     }
 }
 
-let advance = lexer => {
-
+let peek = lexer => {
     switch String.get(lexer.source, lexer.currentIndex) {
     | char =>
-        lexer.currentIndex = lexer.currentIndex + 1
-        lexer.currentColumn = lexer.currentColumn + 1
         Some(char)
     | exception _ => None
     }
 }
 
+let advance = lexer => {
+    switch lexer->peek {
+    | Some(_) as maybeChar =>
+        lexer.currentIndex = lexer.currentIndex + 1
+        lexer.currentColumn = lexer.currentColumn + 1
+        maybeChar
+    | None => None
+    }
+}
+
+let advanceAndIgnoreResult = lexer => {
+    let _ = lexer->advance
+}
+
 let advanceToTheNextLine = lexer => {
     lexer.currentLine = lexer.currentLine + 1
     lexer.currentColumn = 1
+}
+
+let rec scanString = lexer => {
+    switch lexer->peek {
+    | None => ScanError(UnterminatedString)
+    | Some('"') => 
+        let value = Js.String.substring(
+            ~from=lexer.startIndex + 1, 
+            ~to_=lexer.currentIndex,
+            lexer.source
+        );
+
+        lexer->advanceAndIgnoreResult
+        FoundToken(String(value))
+    | Some(c) => 
+        if (c === '\n') {
+            lexer->advanceToTheNextLine
+        }
+
+        lexer->advanceAndIgnoreResult
+        lexer->scanString
+    }
 }
 
 let scanToken = (lexer) => {
@@ -56,8 +90,9 @@ let scanToken = (lexer) => {
             | ':' => FoundToken(Token.Colon)
             | ' ' | '\t' | '\r'=> SkippedCharacter
             | '\n' => 
-                advanceToTheNextLine(lexer) 
+                lexer->advanceToTheNextLine 
                 SkippedCharacter
+            | '"' => lexer->scanString
             | _ =>
                 ScanError(UknownCharacter)
             }

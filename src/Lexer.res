@@ -11,6 +11,7 @@ type t = {
 type scanErrorType =
     | UknownCharacter
     | UnterminatedString
+    | InvalidNumber
 
 type singleScanResult =
     | FoundToken(Token.t)
@@ -30,22 +31,32 @@ let makeLexer = (str) => {
     }
 }
 
-let peek = lexer => {
-    switch String.get(lexer.source, lexer.currentIndex) {
+let isDigit = character => {
+    switch character {
+    | '0' .. '9' => true
+    | _ => false
+    }
+}
+
+let getCharacterAtIndex = (lexer, index) => {
+    switch String.get(lexer.source, index) {
     | char =>
         Some(char)
     | exception _ => None
     }
 }
 
+let getCharacterAtCurrentIndex = lexer => {
+    getCharacterAtIndex(lexer, lexer.currentIndex)
+}
+
+let getCharacterAtNextIndex = lexer => {
+    getCharacterAtIndex(lexer, lexer.currentIndex + 1)
+}
+
 let advance = lexer => {
-    switch lexer->peek {
-    | Some(_) as maybeChar =>
-        lexer.currentIndex = lexer.currentIndex + 1
-        lexer.currentColumn = lexer.currentColumn + 1
-        maybeChar
-    | None => None
-    }
+    lexer.currentIndex = lexer.currentIndex + 1
+    lexer.currentColumn = lexer.currentColumn + 1
 }
 
 let advanceAndIgnoreResult = lexer => {
@@ -58,7 +69,7 @@ let advanceToTheNextLine = lexer => {
 }
 
 let rec scanString = lexer => {
-    switch lexer->peek {
+    switch lexer->getCharacterAtCurrentIndex {
     | None => ScanError(UnterminatedString)
     | Some('"') => 
         let value = Js.String.substring(
@@ -79,9 +90,36 @@ let rec scanString = lexer => {
     }
 }
 
+let scanNumber = lexer => {
+    let rec peekTheNextNumber = lexer => {
+        lexer->advanceAndIgnoreResult
+
+        switch lexer->getCharacterAtCurrentIndex {
+        | Some(c) if isDigit(c)=> peekTheNextNumber(lexer)
+        | Some(_) | None => ()
+        }
+    }
+
+    peekTheNextNumber(lexer)
+
+    let value = Js.String.substring(
+        ~from=lexer.startIndex, 
+        ~to_=lexer.currentIndex,
+        lexer.source
+    );
+
+    switch Float.fromString(value) { 
+    | Some(c) => FoundToken(NumberLiteral(c))
+    | None => ScanError(InvalidNumber)
+    }
+}
+
+
 let scanToken = (lexer) => {
+    lexer->advance
+
     lexer
-        ->advance
+        ->getCharacterAtCurrentIndex
         ->Option.mapWithDefault(ReachedTheEnd, character =>
             switch character {
             | '{' => FoundToken(Token.LeftCurlyBracket)
@@ -92,7 +130,17 @@ let scanToken = (lexer) => {
             | '\n' => 
                 lexer->advanceToTheNextLine 
                 SkippedCharacter
-            | '"' => lexer->scanString
+            | '"' => 
+                lexer->advanceAndIgnoreResult
+                lexer->scanString
+            | '-' =>
+                switch lexer->getCharacterAtNextIndex {
+                | Some(c) if isDigit(c) => 
+                    lexer->scanNumber
+                | Some(_) | None => ScanError(UknownCharacter)
+                }
+            | character if isDigit(character) =>
+                lexer->scanNumber
             | _ =>
                 ScanError(UknownCharacter)
             }

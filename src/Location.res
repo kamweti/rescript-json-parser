@@ -1,6 +1,6 @@
 type pos = {
     line: int,
-    col: int
+    column: int
 }
 
 type t = {
@@ -8,16 +8,7 @@ type t = {
     end: pos
 }
 
-type located<'a> = {
-    val: 'a,
+type located = {
+    token: Token.t,
     location: t
-}
-
-let dummy = {
-    let dummyPos = { line: 0, col: 0}
-
-    {
-        start: dummyPos,
-        end: dummyPos
-    }
 }

@@ -11,7 +11,7 @@ type t =
     | False
     | Null
     | String(string)
-    | NumberLiteral(float)
+    | NumberLiteral(string)
     | Eof
 
 let toString = (token) => 
@@ -26,6 +26,12 @@ let toString = (token) =>
     | False => "false"
     | Null => "null"
     | String(value) => value
-    | NumberLiteral(value) => Js.Float.toString(value)
+    | NumberLiteral(value) => value
     | Eof => "eof"
     }
+
+let keywordMap = [
+    ("true", True),
+    ("false", False),
+    ("null", Null)
+]

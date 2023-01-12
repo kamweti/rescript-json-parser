@@ -39,7 +39,7 @@ let isDigit = character => {
     }
 }
 
-let  emitLocatedToken = (token, lexer) => LocatedToken({
+let emitLocatedToken = (token, lexer) => LocatedToken({
     token: token,
     location: {
         start: {
@@ -157,7 +157,6 @@ let rec scanKeyword = lexer => {
 }
 
 let scanToken = (lexer) => {
-    lexer->advance
 
     lexer
         ->getCurrentCharacter
@@ -200,9 +199,13 @@ let scan = source => {
         lexer.startColumn = lexer.currentColumn
 
         switch scanToken(lexer) {
-        | SkippedCharacter => loop(accumulatedTokens, accumulatedErrors)
+        | SkippedCharacter => 
+            lexer->advance
+            loop(accumulatedTokens, accumulatedErrors)
         | ScanError(error) => loop(accumulatedTokens, list{error, ...accumulatedErrors})
-        | LocatedToken(token) => loop(list{token, ...accumulatedTokens}, accumulatedErrors)
+        | LocatedToken(token) => 
+            lexer->advance
+            loop(list{token, ...accumulatedTokens}, accumulatedErrors)
         | ReachedTheEnd => 
 
             let eof: Location.located = {

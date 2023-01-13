@@ -8,16 +8,20 @@ type t = {
     mutable currentLine: int,
 }
 
-type scanErrorType =
+type rec lexerError = {
+    loc: Location.t,
+    desc: lexerErrorDesc
+}
+and lexerErrorDesc =
     | UknownCharacter
     | UnterminatedString
     | InvalidNumber
-    | InvalidKeyword
+    | InvalidLiteralName
 
 type singleScanResult =
-    | LocatedToken(Location.located)
+    | LocatedToken(Location.located<Token.t>)
     | SkippedCharacter
-    | ScanError(scanErrorType)
+    | ScanError(lexerError)
     | ReachedTheEnd
 
 let makeLexer = (str) => {
@@ -39,9 +43,8 @@ let isDigit = character => {
     }
 }
 
-let emitLocatedToken = (token, lexer) => LocatedToken({
-    token: token,
-    location: {
+let emitCurrentLocation = (lexer) => {
+    let currentloc: Location.t = {
         start: {
             line: lexer.startLine,
             column: lexer.startColumn
@@ -51,49 +54,57 @@ let emitLocatedToken = (token, lexer) => LocatedToken({
             column: lexer.currentColumn
         }
     }
+
+    currentloc
+}
+
+let emitLocatedToken = (token, lexer) => LocatedToken({
+    token: token,
+    location: emitCurrentLocation(lexer)
 })
 
-let getCharacterAtIndex = (lexer, index) => {
-    switch String.get(lexer.source, index) {
-    | char =>
-        Some(char)
+let currentChar = (lexer) => {
+    switch String.get(lexer.source, lexer.currentIndex) {
+    | c => Some(c)
     | exception _ => None
     }
 }
 
-let getCurrentCharacter = lexer => {
-    getCharacterAtIndex(lexer, lexer.currentIndex)
-}
+let nextChar = lexer =>
+  switch String.get(lexer.source, lexer.currentIndex + 1) {
+  | c => Some(c)
+  | exception _ => None
+  }
 
-let getNextCharacter = lexer => {
-    getCharacterAtIndex(lexer, lexer.currentIndex + 1)
-}
-
-let getNextCharacter2 = lexer => {
-    getCharacterAtIndex(lexer, lexer.currentIndex + 2)
-}
-
-let advance = lexer => {
+let consumeCurrentChar = lexer =>
+  switch currentChar(lexer) {
+  | Some(_) as maybeCurrentChar =>
     lexer.currentIndex = lexer.currentIndex + 1
     lexer.currentColumn = lexer.currentColumn + 1
-    ()
+    maybeCurrentChar
+  | None => None
+  }
+
+let consumeCurrentAndDiscard = lexer => {
+  let _: option<char> = consumeCurrentChar(lexer)
 }
 
-let advance2 = lexer => {
+
+let consumeCurrentChar2 = lexer => {
     lexer.currentIndex = lexer.currentIndex + 2
     lexer.currentColumn = lexer.currentColumn + 2
     ()
 }
 
-let advanceToTheNextLine = lexer => {
+let consumeCurrentCharLineOnly = lexer => {
     lexer.currentLine = lexer.currentLine + 1
     lexer.currentColumn = 1
 }
 
 let rec scanString = lexer => {
 
-    switch lexer->getCurrentCharacter {
-    | None => ScanError(UnterminatedString)
+    switch lexer->currentChar {
+    | None => ScanError({ desc: UnterminatedString, loc: emitCurrentLocation(lexer)})
     | Some('"') => 
         let value = Js.String.substring(
             ~from=lexer.startIndex + 1, 
@@ -101,28 +112,29 @@ let rec scanString = lexer => {
             lexer.source
         );
 
+        lexer->consumeCurrentAndDiscard
         emitLocatedToken(Token.String(value), lexer)
-    | Some('\\') if lexer->getNextCharacter == Some('"') =>
-        lexer->advance2
+    | Some('\\') if lexer->nextChar == Some('"') =>
+        lexer->consumeCurrentAndDiscard
         lexer->scanString
     | Some('\n') => 
-        lexer->advanceToTheNextLine
+        lexer->consumeCurrentCharLineOnly
         lexer->scanString
     | Some(_) => 
-        lexer->advance
+        lexer->consumeCurrentAndDiscard
         lexer->scanString
     }
 }
 
 let rec scanNumber = lexer => {
 
-    switch lexer->getCurrentCharacter { 
+    switch lexer->currentChar { 
     | Some('.') 
     | Some('E')
     | Some('e')
     | Some('-')
     | Some('0' .. '9') => 
-        lexer->advance
+        lexer->consumeCurrentAndDiscard
         scanNumber(lexer)
     | None | Some(_) =>
         let value = Js.String.substring(
@@ -135,11 +147,11 @@ let rec scanNumber = lexer => {
     }
 }
 
-let rec scanKeyword = lexer => {
-    switch lexer->getCurrentCharacter { 
+let rec scanLiteralName = lexer => {
+    switch lexer->currentChar { 
     | Some('a' .. 'z') =>
-        lexer->advance
-        scanKeyword(lexer)
+        lexer->consumeCurrentAndDiscard
+        scanLiteralName(lexer)
     | None | Some(_) =>
         let value = Js.String.substring(
             ~from=lexer.startIndex, 
@@ -148,44 +160,39 @@ let rec scanKeyword = lexer => {
         );
 
         switch value {
-        | "true" => emitLocatedToken(Token.True, lexer)
-        | "false" => emitLocatedToken(Token.False, lexer)
-        | "null" => emitLocatedToken(Token.Null, lexer)
-        | _ => ScanError(InvalidKeyword)
+        | "true" => emitLocatedToken(Token.Boolean(true), lexer)
+        | "false" => emitLocatedToken(Token.Boolean(false), lexer)
+        | "null" => emitLocatedToken(Token.NullValue, lexer)
+        | _ => ScanError({ desc: InvalidLiteralName, loc: emitCurrentLocation(lexer)})
         }
     }
 }
 
 let scanToken = (lexer) => {
-
     lexer
-        ->getCurrentCharacter
+        ->consumeCurrentChar
         ->Option.mapWithDefault(ReachedTheEnd, character =>
             switch character {
-            | '{' => emitLocatedToken(Token.LeftCurlyBracket, lexer)
-            | '}' => emitLocatedToken(Token.RightCurlyBrace, lexer)
+            | '{' => emitLocatedToken(Token.ObjectOpen, lexer)
+            | '}' => emitLocatedToken(Token.ObjectClose, lexer)
             | ',' => emitLocatedToken(Token.Comma, lexer)
             | ':' => emitLocatedToken(Token.Colon, lexer)
-            | '[' => emitLocatedToken(Token.LeftSquareBracket, lexer)
-            | ']' => emitLocatedToken(Token.RightSquareBracket, lexer)
+            | '[' => emitLocatedToken(Token.ArrayOpen, lexer)
+            | ']' => emitLocatedToken(Token.ArrayClose, lexer)
             | ' ' | '\t' | '\r'=> SkippedCharacter
             | '\n' => 
-                lexer->advanceToTheNextLine 
+                lexer->consumeCurrentCharLineOnly 
                 SkippedCharacter
-            | '"' => 
-                lexer->advance
-                lexer->scanString
+            | '"' => lexer->scanString
             | '-' =>
-                switch lexer->getNextCharacter {
+                switch lexer->currentChar {
                 | Some(x) if isDigit(x) =>
-                    lexer->advance
                     lexer->scanNumber
-                | _ => ScanError(UknownCharacter)
+                | _ => ScanError({ desc: UknownCharacter, loc: emitCurrentLocation(lexer)})
                 }
             | ch if isDigit(ch) => lexer->scanNumber
-            | 'a' .. 'z' => lexer->scanKeyword
-            | _ =>
-                ScanError(UknownCharacter)
+            | 'a' .. 'z' => lexer->scanLiteralName
+            | _ => ScanError({ desc: UknownCharacter, loc: emitCurrentLocation(lexer)})
             }
         )
 }
@@ -193,44 +200,26 @@ let scanToken = (lexer) => {
 let scan = source => {
     let lexer = makeLexer(source)
 
-    let rec loop = (accumulatedTokens, accumulatedErrors) => {
+    let rec loop = (accumulatedTokens) => {
         lexer.startIndex = lexer.currentIndex
         lexer.startLine = lexer.currentLine
         lexer.startColumn = lexer.currentColumn
 
         switch scanToken(lexer) {
-        | SkippedCharacter => 
-            lexer->advance
-            loop(accumulatedTokens, accumulatedErrors)
-        | ScanError(error) => loop(accumulatedTokens, list{error, ...accumulatedErrors})
-        | LocatedToken(token) => 
-            lexer->advance
-            loop(list{token, ...accumulatedTokens}, accumulatedErrors)
+        | SkippedCharacter => loop(accumulatedTokens)
+        | LocatedToken(token) => loop(list{token, ...accumulatedTokens})
+        | ScanError(error) => Error(error, accumulatedTokens)
         | ReachedTheEnd => 
-
-            let eof: Location.located = {
+            let eof: Location.located<Token.t> = {
                 token: Token.Eof,
-                location: {
-                    start: {
-                        line: lexer.currentLine,
-                        column: lexer.currentColumn,
-                    },
-                    end: {
-                        line: lexer.currentLine,
-                        column: lexer.currentColumn
-                    },
-                }
+                location: emitCurrentLocation(lexer)
             }
             
             let tokens = list{eof, ...accumulatedTokens}->List.reverse
-            let errors = accumulatedErrors->List.reverse
 
-            switch accumulatedErrors {
-            | list{} => Ok(tokens)
-            | _ => Error(errors, tokens)
-            }
+            Ok(tokens)
         }
     }
 
-    loop(list{}, list{})
+    loop(list{})
 }

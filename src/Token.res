@@ -8,7 +8,7 @@ type t =
     | Comma
     | Colon
     | Boolean(bool)
-    | Null
+    | NullValue
     | String(string)
     | NumberLiteral(string)
     | Eof
@@ -22,7 +22,7 @@ let toString = (token) =>
     | Comma => ","
     | Colon => ":"
     | Boolean(value) => value ? "true" : "false"
-    | Null => "null"
+    | NullValue => "null"
     | String(value) => value
     | NumberLiteral(value) => value
     | Eof => "eof"

@@ -8,7 +8,7 @@ type t = {
     end: pos
 }
 
-type located = {
-    token: Token.t,
+type located<'a> = {
+    token: 'a,
     location: t
 }

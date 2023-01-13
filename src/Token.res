@@ -1,14 +1,13 @@
 exception Syntax_Error(string)
 
 type t = 
-    | LeftSquareBracket
-    | RightSquareBracket
-    | LeftCurlyBracket
-    | RightCurlyBrace
+    | ArrayOpen
+    | ArrayClose
+    | ObjectOpen
+    | ObjectClose
     | Comma
     | Colon
-    | True
-    | False
+    | Boolean(bool)
     | Null
     | String(string)
     | NumberLiteral(string)
@@ -16,22 +15,15 @@ type t =
 
 let toString = (token) => 
     switch token {
-    | LeftSquareBracket => "["
-    | RightSquareBracket => "]"
-    | LeftCurlyBracket => "{"
-    | RightCurlyBrace => "}"
+    | ArrayOpen => "["
+    | ArrayClose => "]"
+    | ObjectOpen => "{"
+    | ObjectClose => "}"
     | Comma => ","
     | Colon => ":"
-    | True => "true"
-    | False => "false"
+    | Boolean(value) => value ? "true" : "false"
     | Null => "null"
     | String(value) => value
     | NumberLiteral(value) => value
     | Eof => "eof"
     }
-
-let keywordMap = [
-    ("true", True),
-    ("false", False),
-    ("null", Null)
-]

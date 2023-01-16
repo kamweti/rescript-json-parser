@@ -1,23 +1,22 @@
-type rec expr = {
-    description: exprDesc,
-    location: Location.t
-}
+type rec json = list<member>
 
-and exprDesc = 
-    | True
-    | False
-    | Null
-    | Object(list<expr>)
-    | Number(string)
+and member = (key, value)
+
+and key = (string, Location.t) 
+
+and value = (v, Location.t)
+
+and v = 
+    | Object(json)
+    | Array(list<v>)
+    | NumberLiteral(string)
     | String(string)
-    | Array(list<expr>)
+    | Boolean(bool)
+    | Null
 
-let makeString = (loc, val) => {
-    description: String(val),
-    location: loc,
-}
 
-let makeObject = (loc, val) => {
-    description: Object(val),
-    location: loc,
-}
+let makeKey = (loc, value) => (value, loc)
+
+let makeStringLiteral = (loc, value) => (String(value), loc)
+
+let makeObjectLiteral = (loc, value) => (Object(value), loc)

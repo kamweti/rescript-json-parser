@@ -1,16 +1,20 @@
 type t = {
-    tokens: array<Location.located>,
+    tokens: array<Location.located<Token.t>>,
     mutable currentIndex: int
 }
+
+open Token
+
+exception ParseError(string, Location.located<Token.t>)
 
 let make = tokens => {
     tokens: tokens,
     currentIndex: 0
 }
 
-let peek = ({tokens, currentIndex}) => Array.getUnsafe(tokens, currentIndex)
+let currentToken = ({tokens, currentIndex}) => Array.getUnsafe(tokens, currentIndex)
 
-let isAtEnd = parser => peek(parser).token == Token.Eof
+let isAtEnd = parser => currentToken(parser).token == Eof
 
 let advance = parser => {
     if (isAtEnd(parser)) {
@@ -20,36 +24,68 @@ let advance = parser => {
     }
 }
 
-let parse = parser => {
+let rec parseValue = (parser) => {
+    switch currentToken(parser).token {
+    // | NumberLiteral => expression
+    // | Boolean(val) => expression
+    // | Null => expression
+    // | ArrayOpen => expression
+    | String(value) => Ast.makeStringLiteral(currentToken(parser).location, value)
+    | ObjectOpen => Ast.makeObjectLiteral(currentToken(parser).location, advanceAfterObjectOpen(parser))
+    | _ => raise(ParseError("Invalid value", currentToken(parser)))
+    }
+}
+and advanceAfterObjectOpen = (parser) => {
 
-    let rec loop = accumulator => {
-        switch peek(parser).token {
-        | Token.String(val) => loop(list{parseString(parser, val), ...accumulator})
-        | Token.LeftCurlyBracket => loop(list{parseObject(parser), ...accumulator})
-        | Token.Colon => 
-            parser->advance
-            loop(accumulator)
-        | Token.RightCurlyBrace
-        | Token.Eof
-        | _ => 
-            accumulator->List.reverse
+    parser->advance
+
+    let rec loop = (parser, members) => {
+        switch currentToken(parser).token {
+        | String(value) => 
+            let key = Ast.makeKey(currentToken(parser).location, value)
+            advanceAfterPropertyName(parser)
+            let val = parseValue(parser)
+            advanceAfterPropertyValue(parser)
+            if (currentToken(parser).token == ObjectClose) {
+                members
+            } else {
+                loop(parser, list{(key, val), ...members})
+            }
+        | _ => raise(ParseError("Expected property name or a `}`", currentToken(parser)))
         }
     }
-    and parseString = (parser, val) => {
-        let {location} = peek(parser)
 
-        parser->advance
-        Ast.makeString(location, val)
+    loop(parser, list{})
+}
+and advanceAfterPropertyName = (parser) => {
+
+    parser->advance
+    switch currentToken(parser).token {
+    | Colon => parser->advance
+    | _ => raise(ParseError("Expected property value", currentToken(parser)))
     }
-    and parseObject = (parser) => {
+}
+and advanceAfterPropertyValue = (parser) => {
 
-        let {location} = peek(parser)
-
-        parser->advance
-        let members = loop(list{})
-        Ast.makeObject(location, members)
+    parser->advance
+    switch currentToken(parser).token {
+    | Comma => parser->advance
+    | ObjectClose => ()
+    | _ => raise(ParseError("Invalid data after property value in object", currentToken(parser)))
     }
+}
 
 
-    Ok(loop(list{}))
+let parse = parser => {
+
+    switch currentToken(parser).token {
+    | ObjectOpen => 
+        try Ok(
+            parseValue(parser)
+        ) catch {
+        | ParseError(message, location) => Error(message, location)
+        }
+    | _ => 
+        Error("Invalid token, expecting a JSON object string", currentToken(parser))
+    }
 }

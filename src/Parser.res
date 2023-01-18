@@ -69,9 +69,26 @@ and advanceAfterPropertyValue = (parser) => {
 
     parser->advance
     switch currentToken(parser).token {
-    | Comma => parser->advance
+    | Comma => advanceAfterComma(parser)
     | ObjectClose => ()
     | _ => raise(ParseError("Invalid data after property value in object", currentToken(parser)))
+    }
+}
+and advanceAfterComma = (parser) => {
+
+    parser->advance
+    switch currentToken(parser).token {
+    | String(_) => ()
+    | _ => raise(ParseError("Invalid data after property value in object", currentToken(parser)))
+    }
+}
+
+let advanceAfterParseCompleted = (parser) => {
+
+    parser->advance
+    switch currentToken(parser).token {
+    | Eof => ()
+    | _ => raise(ParseError("Invalid data after the last property", currentToken(parser)))
     }
 }
 
@@ -80,9 +97,12 @@ let parse = parser => {
 
     switch currentToken(parser).token {
     | ObjectOpen => 
-        try Ok(
-            parseValue(parser)
-        ) catch {
+        try {
+            let ast = parseValue(parser)
+            advanceAfterParseCompleted(parser)
+
+            Ok(ast)
+        } catch {
         | ParseError(message, location) => Error(message, location)
         }
     | _ => 

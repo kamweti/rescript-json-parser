@@ -15,6 +15,7 @@ type rec lexerError = {
 and lexerErrorDesc =
     | UknownCharacter
     | UnterminatedString
+    | InvalidCharInString
     | InvalidNumber
     | InvalidLiteralName
 
@@ -114,9 +115,21 @@ let rec scanString = lexer => {
 
         lexer->consumeCurrentAndDiscard
         emitLocatedToken(Token.String(value), lexer)
-    | Some('\\') if lexer->nextChar == Some('"') =>
-        lexer->consumeCurrentAndDiscard
-        lexer->scanString
+    | Some('\\') =>
+        switch lexer->nextChar {
+        | Some('"')
+        | Some('\\')
+        | Some('/')
+        | Some('b')
+        | Some('f')
+        | Some('n')
+        | Some('r')
+        | Some('t')
+        | Some('u') =>
+            lexer->consumeCurrentAndDiscard
+            lexer->scanString
+        | None | Some(_) => ScanError({ desc: InvalidCharInString, loc: emitCurrentLocation(lexer)})
+        }
     | Some('\n') => 
         lexer->consumeCurrentCharLineOnly
         lexer->scanString

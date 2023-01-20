@@ -8,22 +8,7 @@ type t =
     | Comma
     | Colon
     | Boolean(bool)
-    | NullValue
+    | Null
     | String(string)
-    | NumberLiteral(string)
+    | NumberLiteral(float)
     | Eof
-
-let toString = (token) => 
-    switch token {
-    | ArrayOpen => "["
-    | ArrayClose => "]"
-    | ObjectOpen => "{"
-    | ObjectClose => "}"
-    | Comma => ","
-    | Colon => ":"
-    | Boolean(value) => value ? "true" : "false"
-    | NullValue => "null"
-    | String(value) => value
-    | NumberLiteral(value) => value
-    | Eof => "eof"
-    }

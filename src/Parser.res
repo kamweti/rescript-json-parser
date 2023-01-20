@@ -24,14 +24,14 @@ let advance = parser => {
     }
 }
 
-let rec parseValue = (parser) => {
+let rec parseLiteralValue = (parser) => {
     switch currentToken(parser).token {
-    // | NumberLiteral => expression
-    // | Boolean(val) => expression
-    // | Null => expression
+    | NumberLiteral(val) => Ast.makeLiteralNumber(currentToken(parser).location, val)
+    | Boolean(val) => Ast.makeLiteralBoolean(currentToken(parser).location, val)
+    | Null => Ast.makeLiteralNull(currentToken(parser).location)
     // | ArrayOpen => expression
-    | String(value) => Ast.makeStringLiteral(currentToken(parser).location, value)
-    | ObjectOpen => Ast.makeObjectLiteral(currentToken(parser).location, advanceAfterObjectOpen(parser))
+    | String(value) => Ast.makeLiteralString(currentToken(parser).location, value)
+    | ObjectOpen => Ast.makeObject(currentToken(parser).location, advanceAfterObjectOpen(parser))
     | _ => raise(ParseError("Invalid value", currentToken(parser)))
     }
 }
@@ -42,10 +42,10 @@ and advanceAfterObjectOpen = (parser) => {
     let rec loop = (parser, members) => {
         switch currentToken(parser).token {
         | String(value) => 
-            let key = Ast.makeKey(currentToken(parser).location, value)
-            advanceAfterPropertyName(parser)
-            let val = parseValue(parser)
-            advanceAfterPropertyValue(parser)
+            let key = Ast.makeIdentifier(currentToken(parser).location, value)
+            advanceAfterIdentifier(parser)
+            let val = parseLiteralValue(parser)
+            advanceAfterLiteralValue(parser)
             if (currentToken(parser).token == ObjectClose) {
                 members
             } else {
@@ -57,7 +57,7 @@ and advanceAfterObjectOpen = (parser) => {
 
     loop(parser, list{})
 }
-and advanceAfterPropertyName = (parser) => {
+and advanceAfterIdentifier = (parser) => {
 
     parser->advance
     switch currentToken(parser).token {
@@ -65,7 +65,7 @@ and advanceAfterPropertyName = (parser) => {
     | _ => raise(ParseError("Expected property value", currentToken(parser)))
     }
 }
-and advanceAfterPropertyValue = (parser) => {
+and advanceAfterLiteralValue = (parser) => {
 
     parser->advance
     switch currentToken(parser).token {
@@ -98,7 +98,7 @@ let parse = parser => {
     switch currentToken(parser).token {
     | ObjectOpen => 
         try {
-            let ast = parseValue(parser)
+            let ast = parseLiteralValue(parser)
             advanceAfterParseCompleted(parser)
 
             Ok(ast)

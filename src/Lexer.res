@@ -64,6 +64,13 @@ let emitLocatedToken = (token, lexer) => LocatedToken({
     location: emitCurrentLocation(lexer)
 })
 
+let previousChar = (lexer) => {
+    switch String.get(lexer.source, lexer.currentIndex - 1) {
+    | c => Some(c)
+    | exception _ => None
+    }
+}
+
 let currentChar = (lexer) => {
     switch String.get(lexer.source, lexer.currentIndex) {
     | c => Some(c)
@@ -139,32 +146,77 @@ let rec scanString = lexer => {
     }
 }
 
-let rec scanNumber = lexer => {
+let scanLiteralNumber = lexer => {
 
-    switch lexer->currentChar { 
-    | Some('.') 
-    | Some('E')
-    | Some('e')
-    | Some('-')
-    | Some('0' .. '9') => 
-        lexer->consumeCurrentAndDiscard
-        scanNumber(lexer)
-    | None | Some(_) =>
-        let value = Js.String.substring(
+    exception ScanLiteralNumberException
+    
+    let rec loopOrRaise = (lexer) => switch lexer->previousChar {
+    | Some('0') => loopZero(lexer)
+    | Some('1' .. '9') => loopDigits(lexer)
+    | _ => ()
+    }
+    and loopZero = (lexer) => switch lexer->currentChar {
+        | Some('.') => 
+            lexer->consumeCurrentAndDiscard
+            loopFractional(lexer)
+        | Some('E') | Some('e') => 
+            lexer->consumeCurrentAndDiscard
+            loopExponent(lexer)
+        | _ => raise(ScanLiteralNumberException)
+    }
+    and loopFractional = (lexer) => switch lexer->currentChar {
+        | Some('0' .. '9') => 
+            lexer->consumeCurrentAndDiscard
+            loopFractional(lexer)
+        | Some('E') | Some('e') => 
+            lexer->consumeCurrentAndDiscard
+            loopExponent(lexer)
+        | _ => ()
+    }
+    and loopDigits = (lexer) => switch lexer->currentChar {
+        | Some('0' .. '9') => 
+            lexer->consumeCurrentAndDiscard
+            loopDigits(lexer)
+        | Some('.') => 
+            lexer->consumeCurrentAndDiscard
+            loopFractional(lexer)
+        | Some('E') | Some('e') => 
+            lexer->consumeCurrentAndDiscard
+            loopExponent(lexer)
+        | _ => ()
+    }
+    and loopExponent = (lexer) => switch lexer->currentChar {
+        | Some('0' .. '9')
+        | Some('+')
+        | Some('-') =>
+            lexer->consumeCurrentAndDiscard
+            loopExponent(lexer)
+        | _ => ()
+    }
+
+    try {
+        loopOrRaise(lexer)
+
+        let maybeRawValue = Js.String.substring(
             ~from=lexer.startIndex, 
             ~to_=lexer.currentIndex,
             lexer.source
-        );
+        )->Float.fromString
 
-        emitLocatedToken(Token.NumberLiteral(value), lexer)
+        switch maybeRawValue {
+        | Some(value) => emitLocatedToken(Token.NumberLiteral(value), lexer)
+        | _ => ScanError({ desc: InvalidNumber, loc: emitCurrentLocation(lexer)})
+        }
+    } catch {
+    | ScanLiteralNumberException => ScanError({ desc: InvalidNumber, loc: emitCurrentLocation(lexer)})
     }
 }
 
-let rec scanLiteralName = lexer => {
+let rec scanLiteralBoolOrNull = lexer => {
     switch lexer->currentChar { 
     | Some('a' .. 'z') =>
         lexer->consumeCurrentAndDiscard
-        scanLiteralName(lexer)
+        scanLiteralBoolOrNull(lexer)
     | None | Some(_) =>
         let value = Js.String.substring(
             ~from=lexer.startIndex, 
@@ -175,7 +227,7 @@ let rec scanLiteralName = lexer => {
         switch value {
         | "true" => emitLocatedToken(Token.Boolean(true), lexer)
         | "false" => emitLocatedToken(Token.Boolean(false), lexer)
-        | "null" => emitLocatedToken(Token.NullValue, lexer)
+        | "null" => emitLocatedToken(Token.Null, lexer)
         | _ => ScanError({ desc: InvalidLiteralName, loc: emitCurrentLocation(lexer)})
         }
     }
@@ -200,11 +252,11 @@ let scanToken = (lexer) => {
             | '-' =>
                 switch lexer->currentChar {
                 | Some(x) if isDigit(x) =>
-                    lexer->scanNumber
+                    lexer->scanLiteralNumber
                 | _ => ScanError({ desc: UknownCharacter, loc: emitCurrentLocation(lexer)})
                 }
-            | ch if isDigit(ch) => lexer->scanNumber
-            | 'a' .. 'z' => lexer->scanLiteralName
+            | ch if isDigit(ch) => lexer->scanLiteralNumber
+            | 'a' .. 'z' => lexer->scanLiteralBoolOrNull
             | _ => ScanError({ desc: UknownCharacter, loc: emitCurrentLocation(lexer)})
             }
         )

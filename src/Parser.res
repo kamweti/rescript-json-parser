@@ -24,7 +24,7 @@ let advance = parser => {
     }
 }
 
-let rec parseLiteralValue = (parser) => {
+let rec parseValue = (parser) => {
     switch currentToken(parser).token {
     | NumberLiteral(val) => Ast.makeLiteralNumber(currentToken(parser).location, val)
     | Boolean(val) => Ast.makeLiteralBoolean(currentToken(parser).location, val)
@@ -44,13 +44,14 @@ and advanceAfterObjectOpen = (parser) => {
         | String(value) => 
             let key = Ast.makeIdentifier(currentToken(parser).location, value)
             advanceAfterIdentifier(parser)
-            let val = parseLiteralValue(parser)
-            advanceAfterLiteralValue(parser)
+            let val = parseValue(parser)
+            advanceAfterValue(parser)
             if (currentToken(parser).token == ObjectClose) {
                 members
             } else {
                 loop(parser, list{(key, val), ...members})
             }
+        | ObjectClose => members
         | _ => raise(ParseError("Expected property name or a `}`", currentToken(parser)))
         }
     }
@@ -65,7 +66,7 @@ and advanceAfterIdentifier = (parser) => {
     | _ => raise(ParseError("Expected property value", currentToken(parser)))
     }
 }
-and advanceAfterLiteralValue = (parser) => {
+and advanceAfterValue = (parser) => {
 
     parser->advance
     switch currentToken(parser).token {
@@ -98,14 +99,16 @@ let parse = parser => {
     switch currentToken(parser).token {
     | ObjectOpen => 
         try {
-            let ast = parseLiteralValue(parser)
+            let astObject = Ast.makeRoot(
+                currentToken(parser).location, 
+                advanceAfterObjectOpen(parser)
+            )
             advanceAfterParseCompleted(parser)
 
-            Ok(ast)
+            Ok(astObject)
         } catch {
         | ParseError(message, location) => Error(message, location)
         }
-    | _ => 
-        Error("Invalid token, expecting a JSON object string", currentToken(parser))
+    | _ => Error("Invalid token, expecting a JSON object string", currentToken(parser))
     }
 }

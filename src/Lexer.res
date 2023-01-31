@@ -25,6 +25,15 @@ type singleScanResult =
     | ScanError(lexerError)
     | ReachedTheEnd
 
+let errorToString = e => {
+    switch e {
+    | UknownCharacter => "Uknown character"
+    | UnterminatedString => "Unterminated string"
+    | InvalidCharInString => "Invalid character in string"
+    | InvalidNumber => "Invalid number"
+    | InvalidLiteralName => "Invalid literal name"
+    }
+}
 let makeLexer = (str) => {
     {
         source: str,
@@ -273,7 +282,7 @@ let scan = source => {
         switch scanToken(lexer) {
         | SkippedCharacter => loop(accumulatedTokens)
         | LocatedToken(token) => loop(list{token, ...accumulatedTokens})
-        | ScanError(error) => Error(error, accumulatedTokens)
+        | ScanError(error) => Error(error)
         | ReachedTheEnd => 
             let eof: Location.located<Token.t> = {
                 token: Token.Eof,

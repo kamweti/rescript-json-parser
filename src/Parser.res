@@ -46,10 +46,13 @@ and advanceAfterObjectOpen = (parser) => {
             advanceAfterIdentifier(parser)
             let val = parseValue(parser)
             advanceAfterValue(parser)
+
+            let members = list{(key, val), ...members}
+
             if (currentToken(parser).token == ObjectClose) {
                 members
             } else {
-                loop(parser, list{(key, val), ...members})
+                loop(parser, members)
             }
         | ObjectClose => members
         | _ => raise(ParseError("Expected property name or a `}`", currentToken(parser)))
@@ -99,7 +102,7 @@ let parse = parser => {
     switch currentToken(parser).token {
     | ObjectOpen => 
         try {
-            let astObject = Ast.makeRoot(
+            let astObject = Ast.makeObject(
                 currentToken(parser).location, 
                 advanceAfterObjectOpen(parser)
             )
